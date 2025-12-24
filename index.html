@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bayesian Clinical Training - 60 Cases</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f0f4f8; color: #2d3436; padding: 40px; line-height: 1.6; }
+        .container { max-width: 700px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #edf2f7; margin-bottom: 20px; padding-bottom: 10px; }
+        .problem-count { font-weight: bold; color: #3498db; font-size: 0.9em; text-transform: uppercase; }
+        .scenario { font-size: 1.1em; margin-bottom: 25px; padding: 20px; background: #f8fbff; border-left: 4px solid #3498db; }
+        .input-group { display: flex; gap: 10px; align-items: center; margin-bottom: 20px; }
+        input { padding: 12px; border: 2px solid #dfe6e9; border-radius: 6px; width: 100px; font-size: 16px; }
+        button { padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-submit { background-color: #3498db; color: white; }
+        .btn-submit:hover { background-color: #2980b9; }
+        .btn-next { background-color: #2ecc71; color: white; display: none; }
+        #feedback { margin-top: 20px; padding: 15px; border-radius: 6px; display: none; }
+        .correct { background-color: #d4edda; color: #155724; }
+        .wrong { background-color: #f8d7da; color: #721c24; }
+        .math-box { font-family: monospace; background: rgba(0,0,0,0.05); padding: 5px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <span id="dr-name" style="font-weight: bold;">Dr. Grace</span>
+        <span class="problem-count">Case <span id="case-num">1</span> of 60</span>
+    </div>
+
+    <div id="scenario-text" class="scenario">
+        </div>
+
+    <div class="input-group">
+        <input type="number" id="user-guess" step="0.01" placeholder="0.00">
+        <span>% Probability</span>
+    </div>
+
+    <button class="btn-submit" id="submit-btn" onclick="checkAnswer()">Check Answer</button>
+    <button class="btn-next" id="next-btn" onclick="generateProblem()">Next Case &rarr;</button>
+
+    <div id="feedback"></div>
+</div>
+
+
+
+<script>
+    let currentCase = 1;
+    let correctAnswer = 0;
+
+    const diseases = [
+        "Lyme Borreliosis", "Hypothyroidism", "Vitamin B12 Deficiency", "Sleep Apnea", 
+        "Celiac Disease", "Early-stage Glaucoma", "Iron Deficiency Anemia", "Hypercalcemia",
+        "Pre-diabetes", "Asthma", "Rheumatoid Arthritis", "Mild Hypertension", 
+        "Coronary Artery Disease", "Osteoporosis", "Gout", "Fatty Liver Disease"
+    ];
+
+    const patients = [
+        "Mr. Henderson", "Ms. Kapoor", "James", "Sarah", "Dr. Miller", "The patient", 
+        "A 45-year-old male", "A 30-year-old female", "Mrs. Bennett", "Robert"
+    ];
+
+    function generateProblem() {
+        if (currentCase > 60) {
+            document.querySelector('.container').innerHTML = "<h1>Module Complete</h1><p>You have finished all 60 diagnostic cases.</p>";
+            return;
+        }
+
+        // Reset UI
+        document.getElementById('feedback').style.display = "none";
+        document.getElementById('next-btn').style.display = "none";
+        document.getElementById('submit-btn').style.display = "inline-block";
+        document.getElementById('user-guess').value = "";
+        document.getElementById('case-num').innerText = currentCase;
+
+        // Randomize Doctor
+        const dr = currentCase % 2 === 0 ? "Dr. Aarav" : "Dr. Grace";
+        document.getElementById('dr-name').innerText = dr;
+
+        // Randomize Values
+        const disease = diseases[Math.floor(Math.random() * diseases.length)];
+        const patient = patients[Math.floor(Math.random() * patients.length)];
+        const prev = (Math.random() * (10 - 0.5) + 0.5).toFixed(1); // 0.5% to 10%
+        const sens = (Math.random() * (99 - 80) + 80).toFixed(0);   // 80% to 99%
+        const spec = (Math.random() * (99 - 75) + 75).toFixed(0);   // 75% to 99%
+
+        // Bayes Calculation
+        const p_d = prev / 100;
+        const p_not_d = 1 - p_d;
+        const p_pos_d = sens / 100;
+        const p_pos_not_d = (100 - spec) / 100;
+
+        const numerator = p_pos_d * p_d;
+        const denominator = (p_pos_d * p_d) + (p_pos_not_d * p_not_d);
+        correctAnswer = (numerator / denominator) * 100;
+
+        // Update Text
+        document.getElementById('scenario-text').innerHTML = `
+            ${dr} is seeing <strong>${patient}</strong> to screen for <strong>${disease}</strong>. <br><br>
+            In this population, the disease prevalence is <strong>${prev}%</strong>. 
+            The diagnostic test being used has a sensitivity of <strong>${sens}%</strong> 
+            and a specificity of <strong>${spec}%</strong>. <br><br>
+            If the test result comes back <strong>positive</strong>, what is the post-test probability 
+            that the patient actually has the condition?
+        `;
+    }
+
+    function checkAnswer() {
+        const guess = parseFloat(document.getElementById('user-guess').value);
+        const feedback = document.getElementById('feedback');
+        
+        feedback.style.display = "block";
+        
+        // Margin of error 0.5%
+        if (Math.abs(guess - correctAnswer) < 0.6) {
+            feedback.className = "correct";
+            feedback.innerHTML = `<strong>Correct!</strong> The probability is ${correctAnswer.toFixed(2)}%.`;
+            document.getElementById('submit-btn').style.display = "none";
+            document.getElementById('next-btn').style.display = "inline-block";
+            currentCase++;
+        } else {
+            feedback.className = "wrong";
+            feedback.innerHTML = `Incorrect. Try the calculation again. (Hint: Use Bayes' Theorem).`;
+        }
+    }
+
+    // Initialize first problem
+    generateProblem();
+</script>
+
+</body>
+</html>
