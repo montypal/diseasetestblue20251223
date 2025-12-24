@@ -3,131 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bayesian Clinical Training - 60 Cases</title>
+    <title>Clinical Probability Trainer</title>
     <style>
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f0f4f8; color: #2d3436; padding: 40px; line-height: 1.6; }
-        .container { max-width: 700px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #edf2f7; margin-bottom: 20px; padding-bottom: 10px; }
-        .problem-count { font-weight: bold; color: #3498db; font-size: 0.9em; text-transform: uppercase; }
-        .scenario { font-size: 1.1em; margin-bottom: 25px; padding: 20px; background: #f8fbff; border-left: 4px solid #3498db; }
-        .input-group { display: flex; gap: 10px; align-items: center; margin-bottom: 20px; }
-        input { padding: 12px; border: 2px solid #dfe6e9; border-radius: 6px; width: 100px; font-size: 16px; }
-        button { padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; color: #333; padding: 20px; }
+        .container { max-width: 650px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; margin-bottom: 20px; padding-bottom: 10px; }
+        .score-box { background: #3498db; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; }
+        .scenario { font-size: 1.1em; background: #f9f9f9; padding: 20px; border-left: 5px solid #3498db; margin-bottom: 20px; }
+        input { padding: 12px; border: 1px solid #ccc; border-radius: 5px; width: 80px; font-size: 16px; }
+        button { padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn-submit { background-color: #3498db; color: white; }
-        .btn-submit:hover { background-color: #2980b9; }
         .btn-next { background-color: #2ecc71; color: white; display: none; }
-        #feedback { margin-top: 20px; padding: 15px; border-radius: 6px; display: none; }
-        .correct { background-color: #d4edda; color: #155724; }
-        .wrong { background-color: #f8d7da; color: #721c24; }
-        .math-box { font-family: monospace; background: rgba(0,0,0,0.05); padding: 5px; border-radius: 3px; }
+        #feedback { margin-top: 20px; padding: 15px; border-radius: 5px; display: none; line-height: 1.4; }
+        .correct { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .incorrect { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+        .card { background: #eee; padding: 20px; border-radius: 10px; text-align: center; }
     </style>
 </head>
 <body>
 
-<div class="container">
+<div class="container" id="game-container">
     <div class="header">
-        <span id="dr-name" style="font-weight: bold;">Dr. Grace</span>
-        <span class="problem-count">Case <span id="case-num">1</span> of 60</span>
+        <span id="dr-display" style="font-weight: bold; color: #2c3e50;">Dr. Grace</span>
+        <div class="score-box">Score: <span id="score">0</span> / <span id="attempted">0</span></div>
     </div>
 
-    <div id="scenario-text" class="scenario">
-        </div>
+    <div id="scenario-text" class="scenario"></div>
 
-    <div class="input-group">
-        <input type="number" id="user-guess" step="0.01" placeholder="0.00">
-        <span>% Probability</span>
+    <div id="input-area">
+        <input type="number" id="user-input" step="0.1" placeholder="0.0"> % 
+        <button class="btn-submit" id="submit-btn" onclick="processResponse()">Submit Answer</button>
     </div>
-
-    <button class="btn-submit" id="submit-btn" onclick="checkAnswer()">Check Answer</button>
-    <button class="btn-next" id="next-btn" onclick="generateProblem()">Next Case &rarr;</button>
+    
+    <button class="btn-next" id="next-btn" onclick="nextQuestion()">Next Question &rarr;</button>
 
     <div id="feedback"></div>
 </div>
 
-
-
 <script>
-    let currentCase = 1;
-    let correctAnswer = 0;
+    let currentCount = 0;
+    let score = 0;
+    let lastCorrect = 0;
+    
+    const diseases = ["Hypothyroidism", "Lyme Disease", "Celiac Disease", "Early Diabetes", "Hypertension", "Anemia", "Sleep Apnea", "Glaucoma"];
+    const names = ["Mr. Walsh", "Ms. Rodriguez", "A 40-year-old patient", "James", "Sarah", "Mrs. Lee", "Robert", "Elena"];
 
-    const diseases = [
-        "Lyme Borreliosis", "Hypothyroidism", "Vitamin B12 Deficiency", "Sleep Apnea", 
-        "Celiac Disease", "Early-stage Glaucoma", "Iron Deficiency Anemia", "Hypercalcemia",
-        "Pre-diabetes", "Asthma", "Rheumatoid Arthritis", "Mild Hypertension", 
-        "Coronary Artery Disease", "Osteoporosis", "Gout", "Fatty Liver Disease"
-    ];
+    function generateData() {
+        const prev = (Math.random() * (12 - 1) + 1).toFixed(1);
+        const sens = (Math.random() * (99 - 85) + 85).toFixed(0);
+        const spec = (Math.random() * (99 - 80) + 80).toFixed(0);
+        
+        const p_d = prev / 100;
+        const p_pos_d = sens / 100;
+        const p_fp = (100 - spec) / 100;
+        
+        // Bayes Calculation
+        const prob = (p_pos_d * p_d) / ((p_pos_d * p_d) + (p_fp * (1 - p_d)));
+        return { prev, sens, spec, prob: (prob * 100).toFixed(2) };
+    }
 
-    const patients = [
-        "Mr. Henderson", "Ms. Kapoor", "James", "Sarah", "Dr. Miller", "The patient", 
-        "A 45-year-old male", "A 30-year-old female", "Mrs. Bennett", "Robert"
-    ];
+    let currentData = generateData();
 
-    function generateProblem() {
-        if (currentCase > 60) {
-            document.querySelector('.container').innerHTML = "<h1>Module Complete</h1><p>You have finished all 60 diagnostic cases.</p>";
+    function updateUI() {
+        if (currentCount >= 60) {
+            showFinalScore();
             return;
         }
-
-        // Reset UI
-        document.getElementById('feedback').style.display = "none";
-        document.getElementById('next-btn').style.display = "none";
-        document.getElementById('submit-btn').style.display = "inline-block";
-        document.getElementById('user-guess').value = "";
-        document.getElementById('case-num').innerText = currentCase;
-
-        // Randomize Doctor
-        const dr = currentCase % 2 === 0 ? "Dr. Aarav" : "Dr. Grace";
-        document.getElementById('dr-name').innerText = dr;
-
-        // Randomize Values
+        
+        const dr = (currentCount % 2 === 0) ? "Dr. Grace" : "Dr. Aarav";
+        const patient = names[Math.floor(Math.random() * names.length)];
         const disease = diseases[Math.floor(Math.random() * diseases.length)];
-        const patient = patients[Math.floor(Math.random() * patients.length)];
-        const prev = (Math.random() * (10 - 0.5) + 0.5).toFixed(1); // 0.5% to 10%
-        const sens = (Math.random() * (99 - 80) + 80).toFixed(0);   // 80% to 99%
-        const spec = (Math.random() * (99 - 75) + 75).toFixed(0);   // 75% to 99%
-
-        // Bayes Calculation
-        const p_d = prev / 100;
-        const p_not_d = 1 - p_d;
-        const p_pos_d = sens / 100;
-        const p_pos_not_d = (100 - spec) / 100;
-
-        const numerator = p_pos_d * p_d;
-        const denominator = (p_pos_d * p_d) + (p_pos_not_d * p_not_d);
-        correctAnswer = (numerator / denominator) * 100;
-
-        // Update Text
+        
+        document.getElementById('dr-display').innerText = dr;
         document.getElementById('scenario-text').innerHTML = `
-            ${dr} is seeing <strong>${patient}</strong> to screen for <strong>${disease}</strong>. <br><br>
-            In this population, the disease prevalence is <strong>${prev}%</strong>. 
-            The diagnostic test being used has a sensitivity of <strong>${sens}%</strong> 
-            and a specificity of <strong>${spec}%</strong>. <br><br>
-            If the test result comes back <strong>positive</strong>, what is the post-test probability 
-            that the patient actually has the condition?
+            ${dr} is testing <strong>${patient}</strong> for <strong>${disease}</strong>.<br><br>
+            - Prevalence: <strong>${currentData.prev}%</strong><br>
+            - Sensitivity: <strong>${currentData.sens}%</strong><br>
+            - Specificity: <strong>${currentData.spec}%</strong><br><br>
+            The test is <strong>Positive</strong>. What is the probability of disease?
+        `;
+        document.getElementById('user-input').value = "";
+        document.getElementById('feedback').style.display = "none";
+        document.getElementById('submit-btn').style.display = "inline-block";
+        document.getElementById('next-btn').style.display = "none";
+    }
+
+    function processResponse() {
+        const userVal = parseFloat(document.getElementById('user-input').value);
+        const feedback = document.getElementById('feedback');
+        currentCount++;
+        
+        feedback.style.display = "block";
+        document.getElementById('submit-btn').style.display = "none";
+        document.getElementById('next-btn').style.display = "inline-block";
+
+        const isCorrect = Math.abs(userVal - currentData.prob) < 0.6;
+        
+        if (isCorrect) {
+            score++;
+            feedback.className = "correct";
+            feedback.innerHTML = `<strong>Correct!</strong> The probability is ${currentData.prob}%.`;
+        } else {
+            feedback.className = "incorrect";
+            feedback.innerHTML = `<strong>Incorrect.</strong> The correct probability was ${currentData.prob}%.<br>
+            <small>Calculation: (${currentData.sens/100} * ${currentData.prev/100}) / [(${currentData.sens/100} * ${currentData.prev/100}) + (${(100-currentData.spec)/100} * ${(100-currentData.prev)/100})]</small>`;
+        }
+        
+        document.getElementById('score').innerText = score;
+        document.getElementById('attempted').innerText = currentCount;
+    }
+
+    function nextQuestion() {
+        currentData = generateData();
+        updateUI();
+    }
+
+    function showFinalScore() {
+        const pct = ((score / 60) * 100).toFixed(1);
+        document.getElementById('game-container').innerHTML = `
+            <h2>Final Results</h2>
+            <div class="summary-grid">
+                <div class="card"><strong>Total Correct</strong><br><span style="font-size:2em">${score}/60</span></div>
+                <div class="card"><strong>Accuracy</strong><br><span style="font-size:2em">${pct}%</span></div>
+            </div>
+            <br><button onclick="location.reload()" class="btn-submit">Restart Training</button>
         `;
     }
 
-    function checkAnswer() {
-        const guess = parseFloat(document.getElementById('user-guess').value);
-        const feedback = document.getElementById('feedback');
-        
-        feedback.style.display = "block";
-        
-        // Margin of error 0.5%
-        if (Math.abs(guess - correctAnswer) < 0.6) {
-            feedback.className = "correct";
-            feedback.innerHTML = `<strong>Correct!</strong> The probability is ${correctAnswer.toFixed(2)}%.`;
-            document.getElementById('submit-btn').style.display = "none";
-            document.getElementById('next-btn').style.display = "inline-block";
-            currentCase++;
-        } else {
-            feedback.className = "wrong";
-            feedback.innerHTML = `Incorrect. Try the calculation again. (Hint: Use Bayes' Theorem).`;
-        }
-    }
-
-    // Initialize first problem
-    generateProblem();
+    updateUI();
 </script>
 
 </body>
